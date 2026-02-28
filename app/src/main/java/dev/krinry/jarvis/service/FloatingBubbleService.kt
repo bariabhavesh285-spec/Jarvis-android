@@ -157,31 +157,39 @@ class FloatingBubbleService : Service() {
         var initialX = 0; var initialY = 0
         var initialTouchX = 0f; var initialTouchY = 0f
         var isMoved = false
-        var touchDownTime = 0L
+        val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        val longPressRunnable = Runnable { if (!isMoved) showBubbleMenu() }
 
         bubble.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = bubbleParams.x; initialY = bubbleParams.y
                     initialTouchX = event.rawX; initialTouchY = event.rawY
-                    isMoved = false; touchDownTime = System.currentTimeMillis(); true
+                    isMoved = false
+                    longPressHandler.postDelayed(longPressRunnable, 600)
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - initialTouchX).toInt()
                     val dy = (event.rawY - initialTouchY).toInt()
-                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isMoved = true
+                    if (Math.abs(dx) > dpToPx(5) || Math.abs(dy) > dpToPx(5)) {
+                        if (!isMoved) {
+                            isMoved = true
+                            longPressHandler.removeCallbacks(longPressRunnable)
+                        }
+                    }
                     bubbleParams.x = initialX + dx; bubbleParams.y = initialY + dy
                     windowManager.updateViewLayout(bubble, bubbleParams); true
                 }
                 MotionEvent.ACTION_UP -> {
-                    val holdTime = System.currentTimeMillis() - touchDownTime
+                    longPressHandler.removeCallbacks(longPressRunnable)
                     if (!isMoved) {
-                        if (holdTime >= 500) {
-                            showBubbleMenu()
-                        } else {
-                            onBubbleTapped()
-                        }
+                        onBubbleTapped()
                     }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    longPressHandler.removeCallbacks(longPressRunnable)
                     true
                 }
                 else -> false
